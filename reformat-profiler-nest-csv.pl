@@ -3,10 +3,13 @@
 use strict;
 use warnings;
 
-use 5.014;
+use 5.010;
 use autodie;
 
-foreach my $fin (@ARGV) {
+sub indentByLeven()
+{
+    my $fin = shift;
+
     open my $fh, '<', $fin;
     my @data = <$fh>;
     close $fh;
@@ -14,26 +17,38 @@ foreach my $fin (@ARGV) {
 
     my @newdata;
     foreach my $line (@data) {
-        my $level = substr($line, 38, 2);
-        $level =~ s/ // ;
-        my $commas = "," x $level;
-        if ( $level > 0) {
-            $line =~ s/(.{40}),\s+(.*)$/$1$commas,$2/;
+        my @fields = split ',', $line;
+        my $level = $fields[3];
+        #my $level = substr($line, 38, 2);
+        #$level =~ s/ // ;
+        $fields[4] =~ s/^\s+//;
+        if ( $level =~/\d/ and $level > 0) {
+            splice @fields, 4, 0, "," x $level;
+            #$fields[3] = "," x $level;
+            #$line =~ s/(.{40}),\s+(.*)$/$1$commas,$2/;
         }
+        $line = join ',', @fields;
         push @newdata, $line;
-
-        #my @cols = split($line,",");
-        #print "@cols";
-
-        #my $level = $cols[3];
-        #my $commas = "," x $level;
-        #$cols[5] = $cols[4];
-        #$cols[4] = $commas;
-
-        #$line = join ",", @cols;
-        #print $line;
     }
+    &highLightMissingTime(\@newdata);
     $fin = $fin . ".new.csv";
     open $fh, '>', $fin;
     print $fh @newdata;
 }
+
+sub highLightMissingTime()
+{
+    my $dataref = shift;
+    my @data = @{ $dataref };
+}
+
+sub main
+{
+    my @csvs = glob("*.nest.csv");
+
+    foreach my $fin (@csvs) {
+        &indentByLeven($fin);
+    }
+}
+
+&main;
