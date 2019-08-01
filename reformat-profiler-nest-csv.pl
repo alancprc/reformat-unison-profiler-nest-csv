@@ -6,50 +6,108 @@ use warnings;
 use 5.010;
 use autodie;
 
-sub indentByLeven ()
+&main;
+
+sub IndentByLevelNum ()
+{
+    my $dataref = shift;
+    foreach my $line (@$dataref) {
+        $line = &ReplaceSpaceWithComma($line);
+    }
+}
+
+sub HighLightMissingTime ()
+{
+    my $dataref = shift;
+
+    my $limit = 1;    # time missing limit in ms.
+    my $descrip = "A period of missing time in profiler\n";
+    my %last    = ( start => 0, end => 0, level => 0 );
+    my %current;
+    my @newdata;
+
+    for my $line (@$dataref) {
+        my @fields = split ',', $line;
+        next unless $#fields >= 3;
+
+        $current{'level'} = $fields[3];
+        $current{'start'} = $fields[0];
+        $current{'end'}   = $fields[1];
+
+        if (    $current{'level'} =~ /\d/
+            and $current{'level'} <= $last{'level'}
+            and $current{'start'} - $last{'end'} >= $limit )
+        {
+            my $deltaTime = sprintf "%11.2f", $current{'start'} - $last{'end'};
+            my $missing   = join ",", $last{'end'}, $current{'start'},
+              $deltaTime, $last{'level'}, $descrip;
+            push @newdata, $missing;
+        } elsif ( $current{'level'} =~ /\d/
+            and $current{'level'} > $last{'level'}
+            and $current{'start'} - $last{'start'} >= $limit )
+        {
+            my $deltaTime = sprintf "%11.2f",
+              $current{'start'} - $last{'start'};
+            my $missing = join ",", $last{'start'}, $current{'start'},
+              $deltaTime, $current{'level'}, $descrip;
+            push @newdata, $missing;
+        }
+        push @newdata, $line;
+        %last = %current;
+    }
+    return \@newdata;
+}
+
+sub main
+{
+    # TODO consider other ways to use, e.g. given directories as arguments.
+    my @csvs = glob("*.nest.csv");
+
+    foreach my $fin (@csvs) {
+        my $csv = &GetCsvFileContent($fin);
+        $csv = &HighLightMissingTime($csv);
+        &IndentByLevelNum($csv);
+        &WriteToFile( $fin, $csv );
+    }
+}
+
+=pod
+  START(ms),   STOP(ms),ELAPSED(ms), LEVEL, DESCRIPTIONS,
+       0.00,     170.72,     170.72,   0,   Test: EFUSE0_IRC [Execute Flow Node],
+       0.26,       0.27,       0.01,   1,    PinTypeAtTest,
+      11.42,      11.52,       0.10,   2,     Wait for Queued Setup Delay,
+=cut
+
+sub ReplaceSpaceWithComma ()
+{
+    my $line = shift;
+
+    my @fields = split ',', $line;
+    my $level  = $fields[3];
+
+    if ( $level =~ /\d/ and $level >= 0 ) {
+        $fields[4] =~ s/^\s+//;
+        $fields[4] = ( "," x $level ) . $fields[4];
+    }
+    $line = join ',', @fields;
+}
+
+sub GetCsvFileContent ()
 {
     my $fin = shift;
 
     open my $fh, '<', $fin;
     my @data = <$fh>;
     close $fh;
-
-    my @newdata;
-    foreach my $line (@data) {
-        my @fields = split ',', $line;
-        my $level  = $fields[3];
-
-        #my $level = substr($line, 38, 2);
-        #$level =~ s/ // ;
-        $fields[4] =~ s/^\s+//;
-        if ( $level =~ /\d/ and $level > 0 ) {
-            splice @fields, 4, 0, "," x $level;
-
-            #$fields[3] = "," x $level;
-            #$line =~ s/(.{40}),\s+(.*)$/$1$commas,$2/;
-        }
-        $line = join ',', @fields;
-        push @newdata, $line;
-    }
-    &highLightMissingTime( \@newdata );
-    $fin = $fin . ".new.csv";
-    open $fh, '>', $fin;
-    print $fh @newdata;
+    return \@data;
 }
 
-sub highLightMissingTime ()
+sub WriteToFile ()
 {
+    my $fn      = shift;
     my $dataref = shift;
-    my @data    = @{$dataref};
+
+    $fn .= ".new.csv";
+    open my $fh, '>', $fn;
+    print $fh @$dataref;
 }
-
-sub main
-{
-    my @csvs = glob("*.nest.csv");
-
-    foreach my $fin (@csvs) {
-        &indentByLeven($fin);
-    }
-}
-
-&main;
