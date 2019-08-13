@@ -65,8 +65,8 @@ sub main
 
     foreach my $fin (@csvs) {
         my $csv = &GetCsvFileContent($fin);
-        $csv = &HighLightMissingTime($csv);
         &IndentByLevelNum($csv);
+        $csv = &HighLightMissingTime($csv);
         &WriteToFile( $fin, $csv );
     }
 }
