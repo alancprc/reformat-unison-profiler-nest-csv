@@ -21,7 +21,7 @@ sub HighLightMissingTime ()
     my $dataref = shift;
 
     my $limit = 1;    # time missing limit in ms.
-    my $descrip = "A period of missing time in profiler\n";
+    my $descrip = "missing time in profiler\n";
     my %last    = ( start => 0, end => 0, level => 0 );
     my %current;
     my @newdata;
@@ -33,6 +33,8 @@ sub HighLightMissingTime ()
         $current{'level'} = $fields[3];
         $current{'start'} = $fields[0];
         $current{'end'}   = $fields[1];
+
+        push @newdata, $line and next unless $current{'level'} =~ /\d/;
 
         if (    $current{'level'} =~ /\d/
             and $current{'level'} <= $last{'level'}
@@ -55,7 +57,7 @@ sub HighLightMissingTime ()
         push @newdata, $line;
         %last = %current;
     }
-    return \@newdata;
+    @$dataref = @newdata;
 }
 
 sub main
@@ -66,7 +68,7 @@ sub main
     foreach my $fin (@csvs) {
         my $csv = &GetCsvFileContent($fin);
         &IndentByLevelNum($csv);
-        $csv = &HighLightMissingTime($csv);
+        &HighLightMissingTime($csv);
         &WriteToFile( $fin, $csv );
     }
 }
